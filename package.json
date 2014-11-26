@@ -8,7 +8,7 @@
   "author": "@torgeir",
   "license": "mit",
   "dependencies": {
-    "immstruct": "~0.9.0",
+    "immstruct": "^0.9.0",
     "jsx-loader": "^0.12.2",
     "omniscient": "^2.0.1",
     "react": "^0.12.1",
