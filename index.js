@@ -62,7 +62,9 @@ function rerender (structure, el) {
     React.render(<Handler cursor={cursor} statics={state} />, el);
   }
 
-  structure.on('swap', render);
+  structure.on('swap', function() {
+    render();
+  });
 
   return render;
 }
