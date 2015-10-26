@@ -1,13 +1,12 @@
 var React = require('react');
+var ReactDOM = require('react-dom');
 var Router = require('react-router');
-var { Route, RouteHandler, DefaultRoute, Link } = Router;
+var { Router, Route, Link, IndexRoute } = require('react-router');
 
-var RouterHelper = require('./router-helper');
-
-var component = require('omniscient').withDefaults({ jsx: true });
-component.debug();
-
+var observer = require('omnipotent/decorator/observer');
 var immstruct = require('immstruct');
+var component = require('omniscient');
+component.debug();
 
 var data = immstruct({ even: 0, odd: 1 });
 
@@ -25,67 +24,84 @@ function toggleUpdates () {
   }
 }
 
-var alwaysRerender = { shouldComponentUpdate: () => true };
-
-var App = component('App', [alwaysRerender], function () {
+// No need for Omniscient optimization (we want this to always re-render)
+// So use vanilla React stateless component
+var App = function App (props) {
   return (
     <div>
       <ul>
-        <li><Link to="even">Even</Link></li>
-        <li><Link to="odd">Odd</Link></li>
-        <li><Link to="nested-route">Nested route</Link></li>
+        <li><Link to="/even">Even</Link></li>
+        <li><Link to="/odd">Odd</Link></li>
+        <li><Link to="/nested-route">Nested route</Link></li>
       </ul>
       <button onClick={toggleUpdates}>toggle automatic updates</button>
-      <RouteHandler {...this.props}/>
+      {props.children}
     </div>
   );
+};
+
+var Even = component(function Even ({ even }) {
+  return <p>
+    Even {even.deref()}
+    <button onClick={ _ => even.update(inc)}>increase</button>
+  </p>;
 });
 
-var Even = component('Even', function ({ cursor }) {
-  return <p>Even {cursor.deref()} <button onClick={ _ => cursor.update(inc)}>increase</button></p>;
+var Odd = component(function Odd ({ odd }) {
+  return <p>
+    Odd {odd.deref()}
+    <button onClick={ _ => odd.update(inc)}>increase</button>
+  </p>;
 });
 
-var Odd = component('Odd', function ({ cursor, statics }) {
-  console.log('the route is', statics.path);
-  return <p>Odd {cursor.deref()} <button onClick={ _ => cursor.update(inc)}>increase</button></p>;
-});
+// Decorate Even and Odd to auto update when they change internally
+// Make it fit as a component to a route.
+// RouterEven and RouterOdd will listen to the path provided as value,
+// and give a cursor named the same as the property to the compoennt.
+// Virtually creating a local render loop.
+// Read more here: https://github.com/omniscientjs/omnipotent
+var RouterEven = observer(data, {
+  even: ['even'] // key path in structure
+}, Even);
 
-var OuterRoute = component('Outer', [alwaysRerender], function () {
+var RouterOdd = observer(data, {
+  odd: ['odd'] // key path in structure
+}, Odd);
+
+// No need for Omniscient optimization (we want this to always re-render)
+// So use vanilla React stateless component
+var OuterRoute = function (props) {
   return <div>
     <p>Outer route</p>
     <ul>
-      <li><Link to="nested-route">Nested route</Link></li>
-      <li><Link to="another-nested-route">Another nested route</Link></li>
+      <li><Link to="/nested-route">Nested route</Link></li>
+      <li><Link to="/another-nested-route">Another nested route</Link></li>
     </ul>
-    <RouteHandler />
+    {props.children}
   </div>;
-});
+};
 
-var NestedRoute = component('Nested', function () {
+var NestedRoute = component(function Nested () {
   return <p>Nested route was rendered on {String(new Date())}</p>;
 });
-var AnotherNestedRoute = component('AnotherNested', function () {
+
+var AnotherNestedRoute = component(function AnotherNested () {
   return <p>Another nested route was rendered on {String(new Date())}</p>;
 });
 
-var RouterEven = RouterHelper(Even, data, 'even');
-var RouterOdd = RouterHelper(Odd, data, 'odd');
-
-var routes = (
-  <Route handler={App}>
-    <DefaultRoute handler={RouterEven} />
-    <Route name="even" handler={RouterEven} />
-    <Route name="odd" handler={RouterOdd} />
-    <Route name="outer-route" handler={OuterRoute}>
-      <Route name="nested-route" handler={NestedRoute}/>
-      <Route name="another-nested-route" handler={AnotherNestedRoute}/>
+ReactDOM.render((
+  <Router>
+    <Route path="/" component={App}>
+      <IndexRoute component={RouterEven} />
+      <Route path="/even" component={RouterEven} />
+      <Route path="/odd" component={RouterOdd} />
+      <Route path="/outer-route" component={OuterRoute}>
+        <Route path="/nested-route" component={NestedRoute}/>
+        <Route path="/another-nested-route" component={AnotherNestedRoute}/>
+      </Route>
     </Route>
-  </Route>
-);
-
-Router.run(routes, function (Handler, state) {
-  React.render(<Handler cursor={data.cursor()} statics={state} />, document.body);
-});
+  </Router>
+), document.querySelector('#app'));
 
 function inc (m) {
   return m + 2;
